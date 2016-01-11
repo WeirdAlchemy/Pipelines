@@ -303,8 +303,6 @@ BiasFieldSmoothingSigma=`opts_GetOpt1 "--bfsigma" $@`
 # running the commands (the default is to actually run the commands)
 RUN=`opts_GetOpt1 "--printcom" $@`
 
-RUN=echo
-
 # ------------------------------------------------------------------------------
 #  Show Command Line Options
 # ------------------------------------------------------------------------------
@@ -535,8 +533,6 @@ ${RUN} fslmaths ${T1wFolder}/${T1wImage}_acpc_dc_restore \
 #  Atlas Registration to MNI152: FLIRT + FNIRT
 #  Also applies registration to T1w and T2w images
 # ------------------------------------------------------------------------------
-
-RUN=""
 
 
 log_Msg "Performing Atlas Registration to MNI152 (FLIRT and FNIRT)"
