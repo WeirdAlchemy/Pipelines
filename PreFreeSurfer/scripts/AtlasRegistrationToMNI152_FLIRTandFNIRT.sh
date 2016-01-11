@@ -14,7 +14,6 @@ Usage() {
   echo "                --t1=<t1w image>"
   echo "                --t1rest=<bias corrected t1w image>"
   echo "                --t1restbrain=<bias corrected, brain extracted t1w image>"
-  echo "                --t2=<t2w image>"
   echo "                --ref=<reference image>"
   echo "                --refbrain=<reference brain image>"
   echo "                --refmask=<reference brain mask>"
@@ -63,7 +62,7 @@ defaultopt() {
 # Just give usage if no arguments specified
 if [ $# -eq 0 ] ; then Usage; exit 0; fi
 # check for correct options
-if [ $# -lt 17 ] ; then Usage; exit 1; fi
+if [ $# -lt 11 ] ; then Usage; exit 1; fi
 
 # parse arguments
 WD=`getopt1 "--workingdir" $@`  # "$1"

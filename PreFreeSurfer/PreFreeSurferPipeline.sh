@@ -303,6 +303,8 @@ BiasFieldSmoothingSigma=`opts_GetOpt1 "--bfsigma" $@`
 # running the commands (the default is to actually run the commands)
 RUN=`opts_GetOpt1 "--printcom" $@`
 
+RUN=echo
+
 # ------------------------------------------------------------------------------
 #  Show Command Line Options
 # ------------------------------------------------------------------------------
@@ -485,6 +487,8 @@ done
 #  T2w to T1w Registration and Optional Readout Distortion Correction
 # ------------------------------------------------------------------------------
 
+${RUN} cp ${T1wFolder}/${T1wImage}_acpc.nii.gz ${T1wFolder}/${T1wImage}_acpc_dc.nii.gz
+${RUN} cp ${T1wFolder}/${T1wImage}_acpc_brain.nii.gz ${T1wFolder}/${T1wImage}_acpc_dc_brain.nii.gz
 
 
 # ------------------------------------------------------------------------------
@@ -514,15 +518,15 @@ mkdir -p ${T1wFolder}/BiasFieldCorrection_sqrtT1wXT1w
 
 #TODO Adjust shrink factor back down to 3 or 2
 
-N4BiasFieldCorrection \
-          --image-dimensionality 3
-          --input-image ${T1wFolder}/${T1wImage}_acpc_dc
-          --output ${T1wFolder}/${T1wImage}_acpc_dc_restore
-          --shrink-factor 4
-          --convergence [50x50x50x50,0.0000001]
+${RUN} N4BiasFieldCorrection \
+          --image-dimensionality 3 \
+          --input-image ${T1wFolder}/${T1wImage}_acpc_dc.nii.gz \
+          --output ${T1wFolder}/${T1wImage}_acpc_dc_restore.nii.gz \
+          --shrink-factor 4 \
+          --convergence [50x50x50x50,0.0000001] \
           --bspline-fitting [200]
 
-fslmaths ${T1wFolder}/${T1wImage}_acpc_dc_restore \
+${RUN} fslmaths ${T1wFolder}/${T1wImage}_acpc_dc_restore \
     -mas ${T1wFolder}/${T1wImage}_acpc_dc_brain \
     ${T1wFolder}/${T1wImage}_acpc_dc_restore_brain
 
@@ -531,6 +535,9 @@ fslmaths ${T1wFolder}/${T1wImage}_acpc_dc_restore \
 #  Atlas Registration to MNI152: FLIRT + FNIRT
 #  Also applies registration to T1w and T2w images
 # ------------------------------------------------------------------------------
+
+RUN=""
+
 
 log_Msg "Performing Atlas Registration to MNI152 (FLIRT and FNIRT)"
 
