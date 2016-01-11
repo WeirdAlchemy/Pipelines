@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 
 echo "This script must be SOURCED to correctly setup the environment prior to running any of the other HCP scripts contained here"
 
@@ -17,8 +17,8 @@ export FSL_DIR="${FSLDIR}"
 #. ${FREESURFER_HOME}/SetUpFreeSurfer.sh > /dev/null 2>&1
 
 # Set up specific environment variables for the HCP Pipeline
-export HCPPIPEDIR=${HOME}/projects/Pipelines
-export CARET7DIR=${HOME}/tools/workbench/bin_rh_linux64
+export HCPPIPEDIR=/shared/studies/nonregulated/connectome/Pipelines
+export CARET7DIR=/usr/bin
 
 export HCPPIPEDIR_Templates=${HCPPIPEDIR}/global/templates
 export HCPPIPEDIR_Bin=${HCPPIPEDIR}/global/binaries
@@ -35,4 +35,3 @@ export HCPPIPEDIR_dMRITract=${HCPPIPEDIR}/DiffusionTractography/scripts
 export HCPPIPEDIR_Global=${HCPPIPEDIR}/global/scripts
 export HCPPIPEDIR_tfMRIAnalysis=${HCPPIPEDIR}/TaskfMRIAnalysis/scripts
 export MSMBin=${HCPPIPEDIR}/MSMBinaries
-
