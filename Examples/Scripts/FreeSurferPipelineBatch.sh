@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 
 get_batch_options() {
     local arguments=($@)
@@ -39,9 +39,9 @@ get_batch_options() {
 
 get_batch_options $@
 
-StudyFolder="${HOME}/projects/Pipelines_ExampleData" #Location of Subject folders (named by subjectID)
-Subjlist="100307" #Space delimited list of subject IDs
-EnvironmentScript="${HOME}/projects/Pipelines/Examples/Scripts/SetUpHCPPipeline.sh" #Pipeline environment script
+StudyFolder="/shared/studies/nonregulated/connectome/Subjects" #Location of Subject folders (named by subjectID)
+Subjlist="26712" #Space delimited list of subject IDs
+EnvironmentScript="/shared/studies/nonregulated/connectome/Pipelines/Examples/Scripts/SetUpHCPPipeline.sh" #Pipeline environment script
 
 if [ -n "${command_line_specified_study_folder}" ]; then
     StudyFolder="${command_line_specified_study_folder}"
@@ -71,7 +71,7 @@ PRINTCOM=""
 #QUEUE="-q veryshort.q"
 
 
-########################################## INPUTS ########################################## 
+########################################## INPUTS ##########################################
 
 #Scripts called by this script do assume they run on the outputs of the PreFreeSurfer Pipeline
 
@@ -85,7 +85,6 @@ for Subject in $Subjlist ; do
   SubjectDIR="${StudyFolder}/${Subject}/T1w" #Location to Put FreeSurfer Subject's Folder
   T1wImage="${StudyFolder}/${Subject}/T1w/T1w_acpc_dc_restore.nii.gz" #T1w FreeSurfer Input (Full Resolution)
   T1wImageBrain="${StudyFolder}/${Subject}/T1w/T1w_acpc_dc_restore_brain.nii.gz" #T1w FreeSurfer Input (Full Resolution)
-  T2wImage="${StudyFolder}/${Subject}/T1w/T2w_acpc_dc_restore.nii.gz" #T2w FreeSurfer Input (Full Resolution)
 
   if [ -n "${command_line_specified_run_local}" ] ; then
       echo "About to run ${HCPPIPEDIR}/FreeSurfer/FreeSurferPipeline.sh"
@@ -100,19 +99,16 @@ for Subject in $Subjlist ; do
       --subjectDIR="$SubjectDIR" \
       --t1="$T1wImage" \
       --t1brain="$T1wImageBrain" \
-      --t2="$T2wImage" \
       --printcom=$PRINTCOM
-      
+
   # The following lines are used for interactive debugging to set the positional parameters: $1 $2 $3 ...
 
   echo "set -- --subject="$Subject" \
       --subjectDIR="$SubjectDIR" \
       --t1="$T1wImage" \
       --t1brain="$T1wImageBrain" \
-      --t2="$T2wImage" \
       --printcom=$PRINTCOM"
 
   echo ". ${EnvironmentScript}"
 
 done
-
