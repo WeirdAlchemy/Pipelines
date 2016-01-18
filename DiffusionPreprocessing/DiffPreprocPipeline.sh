@@ -3,92 +3,92 @@
 #~ND~START~
 #
 # # DiffPreprocPipeline.sh
-# 
+#
 # ## Copyright Notice
 #
 # Copyright (C) 2012-2014 The Human Connectome Project
-# 
+#
 # * Washington University in St. Louis
 # * University of Minnesota
 # * Oxford University
-# 
+#
 # ## Author(s)
-# 
+#
 # * Stamatios Sotiropoulos, FMRIB Analysis Group, Oxford University
 # * Saad Jbabdi, FMRIB Analysis Group, Oxford University
 # * Jesper Andersson, FMRIB Analysis Group, Oxford University
 # * Matthew F. Glasser, Department of Anatomy and Neurobiology, Washington University in St. Louis
 # * Timothy B. Brown, Neuroinfomatics Research Group, Washington University in St. Louis
-# 
+#
 # ## Product
-# 
+#
 # [Human Connectome Project][HCP] (HCP) Pipelines
-# 
+#
 # ## License
 #
 # See the [LICENSE](https://github.com/Washington-University/Pipelines/blob/master/LICENCE.md) file
-# 
-# ## Description 
 #
-# This script, <code>DiffPreprocPipeline.sh</code>, implements the Diffusion 
-# MRI Preprocessing Pipeline described in [Glasser et al. 2013][GlasserEtAl]. 
-# It generates the "data" directory that can be used as input to the fibre 
+# ## Description
+#
+# This script, <code>DiffPreprocPipeline.sh</code>, implements the Diffusion
+# MRI Preprocessing Pipeline described in [Glasser et al. 2013][GlasserEtAl].
+# It generates the "data" directory that can be used as input to the fibre
 # orientation estimation scripts.
-#  
+#
 # ## Prerequisite Installed Software
-# 
+#
 # * [FSL][FSL] - FMRIB's Software Library (version 5.0.6)
 #
 #   FSL's environment setup script must also be sourced
 #
 # * [FreeSurfer][FreeSurfer] (version 5.3.0-HCP)
-# 
+#
 # * [HCP-gradunwarp][HCP-gradunwarp] - (HCP version 1.0.2)
 #
 # ## Prerequisite Environment Variables
-# 
+#
 # See output of usage function: e.g. <code>$ ./DiffPreprocPipeline.sh --help</code>
-# 
+#
 # ## Output Directories
-# 
+#
 # *NB: NO assumption is made about the input paths with respect to the output directories - they can be totally different.
 # All inputs are taken directly from the input variables without additions or modifications.*
-# 
+#
 # Output path specifiers
-# 
+#
 # * <code>${StudyFolder}</code> is an input parameter
 # * <code>${Subject}</code> is an input parameter
-# 
+#
 # Main output directories
-# 
+#
 # * <code>DiffFolder=${StudyFolder}/${Subject}/Diffusion</code>
 # * <code>T1wDiffFolder=${StudyFolder}/${Subject}/T1w/Diffusion</code>
-# 
+#
 # All outputs are within the directory: <code>${StudyFolder}/${Subject}</code>
-# 
+#
 # The full list of output directories are the following
-# 
+#
 # * <code>$DiffFolder/rawdata</code>
 # * <code>$DiffFolder/topup</code>
 # * <code>$DiffFolder/eddy</code>
 # * <code>$DiffFolder/data</code>
 # * <code>$DiffFolder/reg</code>
 # * <code>$T1wDiffFolder</code>
-# 
+#
 # Also assumes that T1 preprocessing has been carried out with results in <code>${StudyFolder}/${Subject}/T1w</code>
-# 
+#
 # <!-- References -->
-# 
+#
 # [HCP]: http://www.humanconnectome.org
 # [GlasserEtAl]: http://www.ncbi.nlm.nih.gov/pubmed/23668970
 # [FSL]: http://fsl.fmrib.ox.ac.uk
 # [FreeSurfer]: http://freesurfer.net
 # [HCP-gradunwarp]: https://github.com/Washington-University/gradunwarp/releases
 # [license]: https://github.com/Washington-University/Pipelines/blob/master/LICENSE.md
-# 
+#
 #~ND~END~
 
-# Setup this script such that if any command exits with a non-zero value, the 
+# Setup this script such that if any command exits with a non-zero value, the
 # script itself exits and does not attempt any further processing.
 set -e
 
@@ -217,7 +217,7 @@ get_options()
 {
 	local scriptName=$(basename ${0})
 	local arguments=($@)
-	
+
 	# initialize global output variables
 	unset StudyFolder
 	unset Subject
@@ -230,16 +230,16 @@ get_options()
 	DegreesOfFreedom=6
 	b0maxbval=${DEFAULT_B0_MAX_BVAL}
 	runcmd=""
-	
+
 	# parse arguments
 	local index=0
 	local numArgs=${#arguments[@]}
 	local argument
-	
+
 	while [ ${index} -lt ${numArgs} ]
 	do
 		argument=${arguments[index]}
-		
+
 		case ${argument} in
 			--help)
 				usage
@@ -300,7 +300,7 @@ get_options()
 				;;
 		esac
 	done
-	
+
 	# check required parameters
 	if [ -z ${StudyFolder} ]
 	then
@@ -308,63 +308,63 @@ get_options()
 		echo "ERROR: <study-path> not specified"
 		exit 1
 	fi
-	
+
 	if [ -z ${Subject} ]
 	then
 		usage
 		echo "ERROR: <subject-id> not specified"
 		exit 1
 	fi
-	
+
 	if [ -z ${PEdir} ]
 	then
 		usage
 		echo "ERROR: <phase-encoding-dir> not specified"
 		exit 1
 	fi
-	
+
 	if [ -z ${PosInputImages} ]
 	then
 		usage
 		echo "ERROR: <positive-phase-encoded-data> not specified"
 		exit 1
 	fi
-	
+
 	if [ -z ${NegInputImages} ]
 	then
 		usage
 		echo "ERROR: <negative-phase-encoded-data> not specified"
 		exit 1
 	fi
-	
+
 	if [ -z ${echospacing} ]
 	then
 		usage
 		echo "ERROR: <echo-spacing> not specified"
 		exit 1
 	fi
-	
+
 	if [ -z ${GdCoeffs} ]
 	then
 		usage
 		echo "ERROR: <path-to-gradients-coefficients-file> not specified"
 		exit 1
 	fi
-	
+
 	if [ -z ${b0maxbval} ]
 	then
 		usage
 		echo "ERROR: <b0-max-bval> not specified"
 		exit 1
 	fi
-	
+
 	if [ -z ${DWIName} ]
 	then
 		usage
 		echo "ERROR: <DWIName> not specified"
 		exit 1
 	fi
-	
+
 	# report options
 	echo "-- ${scriptName}: Specified Command-Line Options - Start --"
 	echo "   StudyFolder: ${StudyFolder}"
@@ -381,13 +381,13 @@ get_options()
 	echo "-- ${scriptName}: Specified Command-Line Options - End --"
 }
 
-# 
+#
 # Function Description
 #  Validate necessary environment variables
 #
 validate_environment_vars()
 {
-	local scriptName=$(basename ${0}) 
+	local scriptName=$(basename ${0})
 	# validate
 	if [ -z ${HCPPIPEDIR_dMRI} ]
 	then
@@ -395,35 +395,35 @@ validate_environment_vars()
 		echo "ERROR: HCPPIPEDIR_dMRI environment variable not set"
 		exit 1
 	fi
-	
+
 	if [ ! -e ${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline_PreEddy.sh ]
 	then
 		usage
 		echo "ERROR: HCPPIPEDIR/DiffusionPreprocessing/DiffPreprocPipeline_PreEddy.sh not found"
 		exit 1
 	fi
-	
+
 	if [ ! -e ${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline_Eddy.sh ]
 	then
 		usage
 		echo "ERROR: HCPPIPEDIR/DiffusionPreprocessing/DiffPreprocPipeline_Eddy.sh not found"
 		exit 1
 	fi
-	
+
 	if [ ! -e ${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline_PostEddy.sh ]
 	then
 		usage
 		echo "ERROR: HCPPIPEDIR/DiffusionPreprocessing/DiffPreprocPipeline_PostEddy.sh not found"
 		exit 1
 	fi
-	
+
 	if [ -z ${FSLDIR} ]
 	then
 		usage
 		echo "ERROR: FSLDIR environment variable not set"
 		exit 1
 	fi
-	
+
 	# report
 	echo "-- ${scriptName}: Environment Variables Used - Start --"
 	echo "   HCPPIPEDIR_dMRI: ${HCPPIPEDIR_dMRI}"
@@ -438,17 +438,17 @@ validate_environment_vars()
 main()
 {
 	# Get Command Line Options
-	# 
+	#
 	# Global Variables Set
 	#  See documentation for get_options function
 	get_options $@
-	
+
 	# Validate environment variables
 	validate_environment_vars $@
-	
+
 	# Establish tool name for logging
 	log_SetToolName "DiffPreprocPipeline.sh"
-	
+
 	log_Msg "Invoking Pre-Eddy Steps"
 	${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline_PreEddy.sh \
 		--path=${StudyFolder} \
@@ -460,14 +460,14 @@ main()
 		--echospacing=${echospacing} \
 		--b0maxbval=${b0maxbval} \
 		--printcom="${runcmd}"
-	
+
 	log_Msg "Invoking Eddy Step"
 	${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline_Eddy.sh \
 		--path=${StudyFolder} \
 		--subject=${Subject} \
 		--dwiname=${DWIName} \
 		--printcom="${runcmd}"
-	
+
 	log_Msg "Invoking Post-Eddy Steps"
 	${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline_PostEddy.sh \
 		--path=${StudyFolder} \
@@ -476,7 +476,7 @@ main()
 		--gdcoeffs=${GdCoeffs} \
 		--dof=${DegreesOfFreedom} \
 		--printcom="${runcmd}"
-	
+
 	log_Msg "Completed"
 	exit 0
 }
@@ -485,4 +485,3 @@ main()
 # Invoke the main function to get things started
 #
 main $@
-

@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 
 get_batch_options() {
     local arguments=($@)
@@ -39,9 +39,9 @@ get_batch_options() {
 
 get_batch_options $@
 
-StudyFolder="${HOME}/projects/Pipelines_ExampleData" #Location of Subject folders (named by subjectID)
-Subjlist="100307" #Space delimited list of subject IDs
-EnvironmentScript="${HOME}/projects/Pipelines/Examples/Scripts/SetUpHCPPipeline.sh" #Pipeline environment script
+StudyFolder="/shared/studies/nonregulated/connectome/Subjects" #Location of Subject folders (named by subjectID)
+Subjlist="26712" #Space delimited list of subject IDs
+EnvironmentScript="/shared/studies/nonregulated/connectome/Pipelines/Examples/Scripts/SetUpHCPPipeline.sh" #Pipeline environment script
 
 if [ -n "${command_line_specified_study_folder}" ]; then
     StudyFolder="${command_line_specified_study_folder}"
@@ -70,7 +70,7 @@ echo "$@"
 PRINTCOM=""
 
 
-########################################## INPUTS ########################################## 
+########################################## INPUTS ##########################################
 
 #Scripts called by this script do assume they run on the outputs of the PreFreeSurfer Pipeline,
 #which is a prerequisite for this pipeline
@@ -132,4 +132,3 @@ for Subject in $Subjlist ; do
       --printcom=$PRINTCOM
 
 done
-
