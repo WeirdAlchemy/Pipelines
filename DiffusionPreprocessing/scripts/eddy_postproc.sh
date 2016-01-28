@@ -6,8 +6,7 @@ echo -e "\n START: eddy_postproc"
 EddyJacFlag="JacobianResampling" 
 
 workingdir=$1
-GdCoeffs=$2  #Coefficients for gradient nonlinearity distortion correction. If "NONE" this corrections is turned off
-CombineDataFlag=$3   #2 for including in the ouput all volumes uncombined (i.e. output file of eddy)
+CombineDataFlag=$2   #2 for including in the ouput all volumes uncombined (i.e. output file of eddy)
                      #1 for including in the ouput and combine only volumes where both LR/RL (or AP/PA) pairs have been acquired
                      #0 As 1, but also include uncombined single volumes"
 
@@ -45,30 +44,9 @@ datadir=${workingdir}/data
 #fi
 
 
-if [ ! $GdCoeffs = "NONE" ] ; then
-    echo "Correcting for gradient nonlinearities"
-    ${FSLDIR}/bin/immv ${datadir}/data ${datadir}/data_warped
-    ${globalscriptsdir}/GradientDistortionUnwarp.sh --workingdir="${datadir}" --coeffs="${GdCoeffs}" --in="${datadir}/data_warped" --out="${datadir}/data" --owarp="${datadir}/fullWarp"
-
-    echo "Computing gradient coil tensor to correct for gradient nonlinearities"
-    ${FSLDIR}/bin/calc_grad_perc_dev --fullwarp=${datadir}/fullWarp -o ${datadir}/grad_dev
-    ${FSLDIR}/bin/fslmerge -t ${datadir}/grad_dev ${datadir}/grad_dev_x ${datadir}/grad_dev_y ${datadir}/grad_dev_z
-    ${FSLDIR}/bin/fslmaths ${datadir}/grad_dev -div 100 ${datadir}/grad_dev #Convert from % deviation to absolute
-    ${FSLDIR}/bin/imrm ${datadir}/grad_dev_?
-    ${FSLDIR}/bin/imrm ${datadir}/trilinear
-    ${FSLDIR}/bin/imrm ${datadir}/data_warped_vol1
-    
-    #Keep the original warped data and warp fields
-    mkdir -p ${datadir}/warped
-    ${FSLDIR}/bin/immv ${datadir}/data_warped ${datadir}/warped
-    ${FSLDIR}/bin/immv ${datadir}/fullWarp ${datadir}/warped
-    ${FSLDIR}/bin/immv ${datadir}/fullWarp_abs ${datadir}/warped
-fi
-
 #Remove negative intensity values (caused by spline interpolation) from final data
 ${FSLDIR}/bin/fslmaths ${datadir}/data -thr 0 ${datadir}/data
 ${FSLDIR}/bin/bet ${datadir}/data ${datadir}/nodif_brain -m -f 0.1
 $FSLDIR/bin/fslroi ${datadir}/data ${datadir}/nodif 0 1
 
 echo -e "\n END: eddy_postproc"
-

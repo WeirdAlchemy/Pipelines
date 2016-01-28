@@ -5,15 +5,11 @@ echo -e "\n START: ${scriptName}"
 
 workingdir=$1
 echo_spacing=$2
-PEdir=$3
-b0dist=$4
-b0maxbval=$5
+b0dist=$3
 
 echo "${scriptName}: Input Parameter: workingdir: ${workingdir}"
 echo "${scriptName}: Input Parameter: echo_spacing: ${echo_spacing}"
-echo "${scriptName}: Input Parameter: PEdir: ${PEdir}"
 echo "${scriptName}: Input Parameter: b0dist: ${b0dist}"
-echo "${scriptName}: Input Parameter: b0maxbval: ${b0maxbval}"
 
 isodd(){
 	echo "$(( $1 % 2 ))"
@@ -22,24 +18,13 @@ isodd(){
 rawdir=${workingdir}/rawdata
 topupdir=${workingdir}/topup
 eddydir=${workingdir}/eddy
-if [ ${PEdir} -eq 1 ]; then    #RL/LR phase encoding
-	basePos="RL"
-	baseNeg="LR"
-elif [ ${PEdir} -eq 2 ]; then  #PA/AP phase encoding
-	basePos="PA"
-	baseNeg="AP"
-else
-	echo -e "\n ${scriptName}: ERROR: basic_preproc: Unrecognized PEdir: ${PEdir}"
-fi
+basePos="PA"
+baseNeg="AP"
 
 
 #Compute Total_readout in secs with up to 6 decimal places
-any=`ls ${rawdir}/${basePos}*.nii* |head -n 1`
-if [ ${PEdir} -eq 1 ]; then    #RL/LR phase encoding
-	dimP=`${FSLDIR}/bin/fslval ${any} dim1`
-elif [ ${PEdir} -eq 2 ]; then  #PA/AP phase encoding
-	dimP=`${FSLDIR}/bin/fslval ${any} dim2`
-fi
+any=`ls ${rawdir}/*s1.nii* |head -n 1`
+dimP=`${FSLDIR}/bin/fslval ${any} dim2`
 nPEsteps=$(($dimP - 1))                         #If GRAPPA is used this needs to include the GRAPPA factor!
 #Total_readout=Echo_spacing*(#of_PE_steps-1)   
 ro_time=`echo "${echo_spacing} * ${nPEsteps}" | bc -l`
@@ -50,9 +35,12 @@ echo "${scriptName}: Total readout time is $ro_time secs"
 ################################################################################################
 ## Intensity Normalisation across Series 
 ################################################################################################
+
+b0maxbval=50
+
 echo "${scriptName}: Rescaling series to ensure consistency across baseline intensities"
 entry_cnt=0
-for entry in ${rawdir}/${basePos}*.nii* ${rawdir}/${baseNeg}*.nii*  #For each series, get the mean b0 and rescale to match the first series baseline
+for entry in ${rawdir}/*_s1.nii.* ${rawdir}/*_s2.nii.*  #For each series, get the mean b0 and rescale to match the first series baseline
 do
 	basename=`imglob ${entry}`
 	echo "${scriptName}: Processing $basename"
@@ -100,181 +88,39 @@ do
 done
 
 
-################################################################################################
-## b0 extraction and Creation of Index files for topup/eddy 
-################################################################################################
-echo "Extracting b0s from PE_Positive volumes and creating index and series files"
-declare -i sesdimt #declare sesdimt as integer
-tmp_indx=1
-while read line ; do  #Read SeriesCorrespVolNum.txt file
-	PCorVolNum[${tmp_indx}]=`echo $line | awk {'print $1'}`
-	tmp_indx=$((${tmp_indx}+1))
-done < ${rawdir}/${basePos}_SeriesCorrespVolNum.txt
-
-scount=1
-scount2=1
-indcount=0
-for entry in ${rawdir}/${basePos}*.nii*  #For each Pos volume
-do
-	#Extract b0s and create index file
-	basename=`imglob ${entry}`
-	Posbvals=`cat ${basename}.bval`
-	count=0  #Within series counter
-	count3=$((${b0dist} + 1))
-	for i in ${Posbvals}
-	do
-		if [ $count -ge ${PCorVolNum[${scount2}]} ]; then
-			tmp_ind=${indcount}
-			if [ $[tmp_ind] -eq 0 ]; then
-				tmp_ind=$((${indcount}+1))
-			fi
-			echo ${tmp_ind} >>${rawdir}/index.txt
-		else  #Consider a b=0 a volume that has a bvalue<50 and is at least 50 volumes away from the previous
-			if [ $i -lt ${b0maxbval} ] && [ ${count3} -gt ${b0dist} ]; then
-				cnt=`$FSLDIR/bin/zeropad $indcount 4`
-				echo "Extracting Pos Volume $count from ${entry} as a b=0. Measured b=$i" >>${rawdir}/extractedb0.txt
-				$FSLDIR/bin/fslroi ${entry} ${rawdir}/Pos_b0_${cnt} ${count} 1
-				if [ ${PEdir} -eq 1 ]; then    #RL/LR phase encoding
-					echo 1 0 0 ${ro_time} >> ${rawdir}/acqparams.txt
-				elif [ ${PEdir} -eq 2 ]; then  #AP/PA phase encoding
-					echo 0 1 0 ${ro_time} >> ${rawdir}/acqparams.txt
-				fi
-				indcount=$((${indcount} + 1))
-				count3=0
-			fi
-			echo ${indcount} >>${rawdir}/index.txt
-			count3=$((${count3} + 1))
-		fi
-		count=$((${count} + 1))
-	done
-	
-	#Create series file
-	sesdimt=`${FSLDIR}/bin/fslval ${entry} dim4` #Number of datapoints per Pos series
-	for (( j=0; j<${sesdimt}; j++ ))
-	do
-		echo ${scount} >> ${rawdir}/series_index.txt
-	done
-	scount=$((${scount} + 1))
-	scount2=$((${scount2} + 1))
-done
-
-echo "Extracting b0s from PE_Negative volumes and creating index and series files"
-tmp_indx=1
-while read line ; do  #Read SeriesCorrespVolNum.txt file
-	NCorVolNum[${tmp_indx}]=`echo $line | awk {'print $1'}`
-	tmp_indx=$((${tmp_indx}+1))
-done < ${rawdir}/${baseNeg}_SeriesCorrespVolNum.txt
-
-Poscount=${indcount}
-indcount=0
-scount2=1
-for entry in ${rawdir}/${baseNeg}*.nii* #For each Neg volume
-do
-	#Extract b0s and create index file
-	basename=`imglob ${entry}`
-	Negbvals=`cat ${basename}.bval`
-	count=0
-	count3=$((${b0dist} + 1))
-	for i in ${Negbvals}
-	do
-		if [ $count -ge ${NCorVolNum[${scount2}]} ]; then
-			tmp_ind=${indcount}
-			if [ $[tmp_ind] -eq 0 ]; then
-				tmp_ind=$((${indcount}+1))
-			fi
-			echo $((${tmp_ind} + ${Poscount})) >>${rawdir}/index.txt
-		else #Consider a b=0 a volume that has a bvalue<50 and is at least 50 volumes away from the previous
-			if [ $i -lt ${b0maxbval} ] && [ ${count3} -gt ${b0dist} ]; then
-				cnt=`$FSLDIR/bin/zeropad $indcount 4`
-				echo "Extracting Neg Volume $count from ${entry} as a b=0. Measured b=$i" >>${rawdir}/extractedb0.txt
-				$FSLDIR/bin/fslroi ${entry} ${rawdir}/Neg_b0_${cnt} ${count} 1
-				if [ ${PEdir} -eq 1 ]; then    #RL/LR phase encoding
-					echo -1 0 0 ${ro_time} >> ${rawdir}/acqparams.txt
-				elif [ ${PEdir} -eq 2 ]; then  #AP/PA phase encoding
-					echo 0 -1 0 ${ro_time} >> ${rawdir}/acqparams.txt
-				fi
-				indcount=$((${indcount} + 1))
-				count3=0
-			fi
-			echo $((${indcount} + ${Poscount})) >>${rawdir}/index.txt
-			count3=$((${count3} + 1))
-		fi
-		count=$((${count} + 1))
-	done
-	
-	#Create series file
-	sesdimt=`${FSLDIR}/bin/fslval ${entry} dim4`
-	for (( j=0; j<${sesdimt}; j++ ))
-	do
-		echo ${scount} >> ${rawdir}/series_index.txt #Create series file
-	done
-	scount=$((${scount} + 1))
-	scount2=$((${scount2} + 1))
-done
-
-################################################################################################
-## Merging Files and correct number of slices 
-################################################################################################
-echo "Merging Pos and Neg images"
-${FSLDIR}/bin/fslmerge -t ${rawdir}/Pos_b0 `${FSLDIR}/bin/imglob ${rawdir}/Pos_b0_????.*`
-${FSLDIR}/bin/fslmerge -t ${rawdir}/Neg_b0 `${FSLDIR}/bin/imglob ${rawdir}/Neg_b0_????.*`
-${FSLDIR}/bin/imrm ${rawdir}/Pos_b0_????
-${FSLDIR}/bin/imrm ${rawdir}/Neg_b0_????
-${FSLDIR}/bin/fslmerge -t ${rawdir}/Pos `echo ${rawdir}/${basePos}*.nii*`
-${FSLDIR}/bin/fslmerge -t ${rawdir}/Neg `echo ${rawdir}/${baseNeg}*.nii*`
-
-paste `echo ${rawdir}/${basePos}*.bval` >${rawdir}/Pos.bval
-paste `echo ${rawdir}/${basePos}*.bvec` >${rawdir}/Pos.bvec
-paste `echo ${rawdir}/${baseNeg}*.bval` >${rawdir}/Neg.bval
-paste `echo ${rawdir}/${baseNeg}*.bvec` >${rawdir}/Neg.bvec
-
-
-dimz=`${FSLDIR}/bin/fslval ${rawdir}/Pos dim3`
-if [ `isodd $dimz` -eq 1 ];then
-	echo "Remove one slice from data to get even number of slices"
-	${FSLDIR}/bin/fslroi ${rawdir}/Pos ${rawdir}/Posn 0 -1 0 -1 1 -1
-	${FSLDIR}/bin/fslroi ${rawdir}/Neg ${rawdir}/Negn 0 -1 0 -1 1 -1
-	${FSLDIR}/bin/fslroi ${rawdir}/Pos_b0 ${rawdir}/Pos_b0n 0 -1 0 -1 1 -1
-	${FSLDIR}/bin/fslroi ${rawdir}/Neg_b0 ${rawdir}/Neg_b0n 0 -1 0 -1 1 -1
-	${FSLDIR}/bin/imrm ${rawdir}/Pos
-	${FSLDIR}/bin/imrm ${rawdir}/Neg
-	${FSLDIR}/bin/imrm ${rawdir}/Pos_b0
-	${FSLDIR}/bin/imrm ${rawdir}/Neg_b0
-	${FSLDIR}/bin/immv ${rawdir}/Posn ${rawdir}/Pos
-	${FSLDIR}/bin/immv ${rawdir}/Negn ${rawdir}/Neg
-	${FSLDIR}/bin/immv ${rawdir}/Pos_b0n ${rawdir}/Pos_b0
-	${FSLDIR}/bin/immv ${rawdir}/Neg_b0n ${rawdir}/Neg_b0
-fi
-
-echo "Perform final merge"
-${FSLDIR}/bin/fslmerge -t ${rawdir}/Pos_Neg_b0 ${rawdir}/Pos_b0 ${rawdir}/Neg_b0 
-${FSLDIR}/bin/fslmerge -t ${rawdir}/Pos_Neg ${rawdir}/Pos ${rawdir}/Neg
-paste ${rawdir}/Pos.bval ${rawdir}/Neg.bval >${rawdir}/Pos_Neg.bvals
-paste ${rawdir}/Pos.bvec ${rawdir}/Neg.bvec >${rawdir}/Pos_Neg.bvecs
-
-${FSLDIR}/bin/imrm ${rawdir}/Pos
-${FSLDIR}/bin/imrm ${rawdir}/Neg
-
-
-################################################################################################
-## Move files to appropriate directories 
-################################################################################################
 echo "Move files to appropriate directories"
-mv ${rawdir}/extractedb0.txt ${topupdir}
-mv ${rawdir}/acqparams.txt ${topupdir}
-${FSLDIR}/bin/immv ${rawdir}/Pos_Neg_b0 ${topupdir}
-${FSLDIR}/bin/immv ${rawdir}/Pos_b0 ${topupdir}
-${FSLDIR}/bin/immv ${rawdir}/Neg_b0 ${topupdir}
+
+# readOutTime = echoSpacing * ((matrixLines*partialFourier/accelerationFactor)-1)
+# (604  * ((104/2)-1) )  / 1000000
+# TODO unclear whether
+echo "0 1 0 0.062212" > ${topupdir}/acqparams.txt
+echo "0 1 0 0.062212" >> ${topupdir}/acqparams.txt
+echo "0 1 0 0.062212" >> ${topupdir}/acqparams.txt
+echo "0 -1 0 0.062212" >> ${topupdir}/acqparams.txt
+echo "0 -1 0 0.062212" >> ${topupdir}/acqparams.txt
+echo "0 -1 0 0.062212" >> ${topupdir}/acqparams.txt
+
+
+${FSLDIR}/bin/fslmerge -t ${topupdir}/Pos_Neg_b0_odd ${rawdir}/dti_supb0 ${rawdir}/dti_supb0rev 
+${FSLDIR}/bin/fslroi ${topupdir}/Pos_Neg_b0_odd ${topupdir}/Pos_Neg_b0_firstslice 0 -1 0 -1 0 1
+${FSLDIR}/bin/fslmerge -z ${topupdir}/Pos_Neg_b0 ${topupdir}/Pos_Neg_b0_firstslice ${topupdir}/Pos_Neg_b0_odd
+${FSLDIR}/bin/imrm ${topupdir}/Pos_Neg_b0_odd ${topupdir}/Pos_Neg_b0_firstslice
+
+${FSLDIR}/bin/fslroi ${topupdir}/Pos_Neg_b0 ${topupdir}/Pos_b0 0 3
+${FSLDIR}/bin/fslroi ${topupdir}/Pos_Neg_b0 ${topupdir}/Neg_b0 3 3
 
 cp ${topupdir}/acqparams.txt ${eddydir}
-mv ${rawdir}/index.txt ${eddydir}
-mv ${rawdir}/series_index.txt ${eddydir}
-${FSLDIR}/bin/immv ${rawdir}/Pos_Neg ${eddydir}
-mv ${rawdir}/Pos_Neg.bvals ${eddydir}
-mv ${rawdir}/Pos_Neg.bvecs ${eddydir}
-mv ${rawdir}/Pos.bv?? ${eddydir}
-mv ${rawdir}/Neg.bv?? ${eddydir}
+
+echo "" > ${eddydir}/index.txt
+echo "" > ${eddydir}/series_index.txt
+
+${FSLDIR}/bin/fslmerge -t ${eddydir}/Pos_Neg_odd ${rawdir}/dti_s1.nii.gz ${rawdir}/dti_s2.nii.gz
+
+${FSLDIR}/bin/fslroi ${eddydir}/Pos_Neg_odd ${eddydir}/Pos_Neg_odd_firstslice 0 -1 0 -1 0 1
+${FSLDIR}/bin/fslmerge -z ${eddydir}/Pos_Neg ${eddydir}/Pos_Neg_odd_firstslice ${eddydir}/Pos_Neg_odd
+${FSLDIR}/bin/imrm ${eddydir}/Pos_Neg_odd ${eddydir}/Pos_Neg_odd_firstslice
+
+paste -d " " ${rawdir}/dti_s1.bval ${rawdir}/dti_s2.bval > ${eddydir}/Pos_Neg.bvals
+paste -d " " ${rawdir}/dti_s1.bvec ${rawdir}/dti_s2.bvec > ${eddydir}/Pos_Neg.bvecs
 
 echo -e "\n END: basic_preproc"
-
-

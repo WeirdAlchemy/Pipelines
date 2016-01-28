@@ -96,9 +96,6 @@ set -e
 source ${HCPPIPEDIR}/global/scripts/log.shlib		# log_ functions
 source ${HCPPIPEDIR}/global/scripts/version.shlib	# version_ functions
 
-# Global default values
-DEFAULT_B0_MAX_BVAL=50
-
 #
 # Function Descripton
 #  Show usage information for this script
@@ -123,23 +120,20 @@ usage()
 	echo "    --subject=<subject-id>"
 	echo "    : Subject ID"
 	echo ""
-	echo "    --PEdir=<phase-encoding-dir>"
-	echo "    : phase encoding direction: 1=LR/RL, 2=AP/PA"
+	echo "    --shell1Data=<shell-1-data>"
+	echo "    : data with smaller b value encoding"
 	echo ""
-	echo "    --posData=<positive-phase-encoding-data>"
-	echo "    : @ symbol separated list of data with positive phase encoding direction"
-	echo "      e.g. dataRL1@dataRL2@...dataRLN"
+	echo "    --shell2Data=<shell-2-data>"
+	echo "    : data with larger b value encoding"
+	echo ""	
+	echo "    --supb0=<supplementary b=0 image>"
+	echo "    : supplementary b=0 image for field mapping with topup"
 	echo ""
-	echo "    --negData=<negative-phase-encoding-data>"
-	echo "    : @ symbol separated list of data with negative phase encoding direction"
-	echo "      e.g. dataLR1@dataLR2@...dataLRN"
+	echo "    --supb0rev=<supplementary b=0 phase-reversed image>"
+	echo "    : supplementary b=0 reversed image for field mapping with topup"
 	echo ""
 	echo "    --echospacing=<echo-spacing>"
 	echo "    : Echo spacing in msecs"
-	echo ""
-	echo "    --gdcoeffs=<path-to-gradients-coefficients-file>"
-	echo "    : path to file containing coefficients that describe spatial variations"
-	echo "      of the scanner gradients. Use --gdcoeffs=NONE if not available"
 	echo ""
 	echo "    [--dwiname=<DWIName>]"
 	echo "    : name to give DWI output directories"
@@ -148,10 +142,6 @@ usage()
 	echo "    [--dof=<Degrees of Freedom>]"
 	echo "    : Degrees of Freedom for post eddy registration to structural images"
 	echo "      defaults to 6"
-	echo ""
-	echo "    [--b0maxbval=<b0-max-bval>]"
-	echo "    : Volumes with a bvalue smaller than this value will be considered as b0s"
-	echo "      If not specified, defaults to ${DEFAULT_B0_MAX_BVAL}"
 	echo ""
 	echo "    [--printcom=<print-command>]"
 	echo "    : Use the specified <print-command> to echo or otherwise output the commands"
@@ -221,14 +211,13 @@ get_options()
 	# initialize global output variables
 	unset StudyFolder
 	unset Subject
-	unset PEdir
-	unset PosInputImages
-	unset NegInputImages
+	unset Shell1Data
+	unset Shell2Data
+	unset Supb0
+	unset Supb0rev
 	unset echospacing
-	unset GdCoeffs
 	DWIName="Diffusion"
 	DegreesOfFreedom=6
-	b0maxbval=${DEFAULT_B0_MAX_BVAL}
 	runcmd=""
 
 	# parse arguments
@@ -257,24 +246,24 @@ get_options()
 				Subject=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
-			--PEdir=*)
-				PEdir=${argument/*=/""}
+			--shell1Data=*)
+				Shell1Data=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
-			--posData=*)
-				PosInputImages=${argument/*=/""}
+			--shell2Data=*)
+				Shell2Data=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
-			--negData=*)
-				NegInputImages=${argument/*=/""}
+			--supb0=*)
+				Supb0=${argument/*=/""}
+				index=$(( index + 1 ))
+				;;
+			--supb0rev=*)
+				Supb0rev=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
 			--echospacing=*)
 				echospacing=${argument/*=/""}
-				index=$(( index + 1 ))
-				;;
-			--gdcoeffs=*)
-				GdCoeffs=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
 			--dwiname=*)
@@ -283,10 +272,6 @@ get_options()
 				;;
 			--dof=*)
 				DegreesOfFreedom=${argument/*=/""}
-				index=$(( index + 1 ))
-				;;
-			--b0maxbval=*)
-				b0maxbval=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
 			--printcom=*)
@@ -316,45 +301,39 @@ get_options()
 		exit 1
 	fi
 
-	if [ -z ${PEdir} ]
+	if [ -z ${Shell1Data} ]
 	then
 		usage
-		echo "ERROR: <phase-encoding-dir> not specified"
+		echo "ERROR: <shell-1-data> not specified"
+		exit 1
+	fi
+	
+	if [ -z ${Shell2Data} ]
+	then
+		usage
+		echo "ERROR: <shell-2-data> not specified"
 		exit 1
 	fi
 
-	if [ -z ${PosInputImages} ]
+	if [ -z ${Supb0} ]
 	then
 		usage
-		echo "ERROR: <positive-phase-encoded-data> not specified"
+		echo "ERROR: <supb0> not specified"
 		exit 1
 	fi
 
-	if [ -z ${NegInputImages} ]
+	if [ -z ${Supb0rev} ]
 	then
 		usage
-		echo "ERROR: <negative-phase-encoded-data> not specified"
+		echo "ERROR: <supb0rev> not specified"
 		exit 1
 	fi
+
 
 	if [ -z ${echospacing} ]
 	then
 		usage
 		echo "ERROR: <echo-spacing> not specified"
-		exit 1
-	fi
-
-	if [ -z ${GdCoeffs} ]
-	then
-		usage
-		echo "ERROR: <path-to-gradients-coefficients-file> not specified"
-		exit 1
-	fi
-
-	if [ -z ${b0maxbval} ]
-	then
-		usage
-		echo "ERROR: <b0-max-bval> not specified"
 		exit 1
 	fi
 
@@ -369,14 +348,13 @@ get_options()
 	echo "-- ${scriptName}: Specified Command-Line Options - Start --"
 	echo "   StudyFolder: ${StudyFolder}"
 	echo "   Subject: ${Subject}"
-	echo "   PEdir: ${PEdir}"
-	echo "   PosInputImages: ${PosInputImages}"
-	echo "   NegInputImages: ${NegInputImages}"
+	echo "   Shell1Data: ${Shell1Data}"
+	echo "   Shell2Data: ${Shell2Data}"
+	echo "   Supb0: ${Supb0}"
+	echo "   Supb0rev: ${Supb0rev}"	
 	echo "   echospacing: ${echospacing}"
-	echo "   GdCoeffs: ${GdCoeffs}"
 	echo "   DWIName: ${DWIName}"
 	echo "   DegreesOfFreedom: ${DegreesOfFreedom}"
-	echo "   b0maxbval: ${b0maxbval}"
 	echo "   runcmd: ${runcmd}"
 	echo "-- ${scriptName}: Specified Command-Line Options - End --"
 }
@@ -450,19 +428,19 @@ main()
 	log_SetToolName "DiffPreprocPipeline.sh"
 
 	log_Msg "Invoking Pre-Eddy Steps"
-	${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline_PreEddy.sh \
+	echo ${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline_PreEddy.sh \
 		--path=${StudyFolder} \
 		--subject=${Subject} \
 		--dwiname=${DWIName} \
-		--PEdir=${PEdir} \
-		--posData=${PosInputImages} \
-		--negData=${NegInputImages} \
+		--shell1Data=${Shell1Data} \
+		--shell2Data=${Shell2Data} \
+		--supb0=${Supb0} \
+		--supb0rev=${Supb0rev} \
 		--echospacing=${echospacing} \
-		--b0maxbval=${b0maxbval} \
 		--printcom="${runcmd}"
 
 	log_Msg "Invoking Eddy Step"
-	${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline_Eddy.sh \
+	echo ${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline_Eddy.sh \
 		--path=${StudyFolder} \
 		--subject=${Subject} \
 		--dwiname=${DWIName} \
@@ -473,7 +451,6 @@ main()
 		--path=${StudyFolder} \
 		--subject=${Subject} \
 		--dwiname=${DWIName} \
-		--gdcoeffs=${GdCoeffs} \
 		--dof=${DegreesOfFreedom} \
 		--printcom="${runcmd}"
 

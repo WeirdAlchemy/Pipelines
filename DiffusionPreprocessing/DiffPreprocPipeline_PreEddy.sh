@@ -69,9 +69,6 @@ set -e
 source ${HCPPIPEDIR}/global/scripts/log.shlib     # log_ functions
 source ${HCPPIPEDIR}/global/scripts/version.shlib # version_ functions
 
-# Global default values
-DEFAULT_B0_MAX_BVAL=50
-
 # 
 # Function Description
 #  Show usage information for this script
@@ -96,16 +93,17 @@ usage()
 	echo "    --subject=<subject-id>"
 	echo "    : Subject ID"
 	echo ""
-	echo "    --PEdir=<phase-encoding-dir>"
-	echo "    : phase encoding direction +/-: 1=RL/LR, 2=PA/AP"
+	echo "    --shell1Data=<shell-1-data>"
+	echo "    : data with smaller b value encoding"
 	echo ""
-	echo "    --posData=<positive-phase-encoding-data>"
-	echo "    : @ symbol separated list of data with positive phase encoding direction"
-	echo "      e.g. dataRL1@dataRL2@...dataRLN"
+	echo "    --shell2Data=<shell-2-data>"
+	echo "    : data with larger b value encoding"
+	echo ""	
+	echo "    --supb0=<supplementary b=0 image>"
+	echo "    : supplementary b=0 image for field mapping with topup"
 	echo ""
-	echo "    --negData=<negative-phase-encoding-data>"
-	echo "    : @ symbol separated list of data with negative phase encoding direction"
-	echo "      e.g. dataLR1@dataLR2@...dataLRN"
+	echo "    --supb0rev=<supplementary b=0 phase-reversed image>"
+	echo "    : supplementary b=0 reversed image for field mapping with topup"
 	echo ""
 	echo "    --echospacing=<echo-spacing>"
 	echo "    : Echo spacing in msecs"
@@ -113,10 +111,6 @@ usage()
 	echo "    [--dwiname=<DWIname>]"
 	echo "    : name to give DWI output directories"
 	echo "      defaults to Diffusion"
-	echo ""
-	echo "    [--b0maxbval=<b0-max-bval>]"
-	echo "    : Volumes with a bvalue smaller than this value will be considered as b0s"
-	echo "      If not specified, defaults to ${DEFAULT_B0_MAX_BVAL}"
 	echo ""
 	echo "    [--printcom=<print-command>]"
 	echo "    : Use the specified <print-command> to echo or otherwise output the commands"
@@ -158,15 +152,30 @@ usage()
 #  ${StudyFolder}		- Path to subject's data folder
 #  ${Subject}			- Subject ID
 #  ${PEdir}				- Phase Encoding Direction, 1=RL/LR, 2=PA/AP
-#  ${PosInputImages}	- @ symbol separated list of data with positive phase encoding direction
-#  ${NegInputImages}	- @ symbol separated lsit of data with negative phase encoding direction 
+#  ${Shell1Data}	- data with smaller b value encoding
+#  ${Shell2Data}	- data with larger b value encoding
+#  ${Supb0}				- supplementary b=0 image for field mapping with topup
+#  ${Supb0rev}		- supplementary b=0 reversed image for field mapping with topup
 #  ${echospacing}		- echo spacing in msecs
 #  ${DWIName}			- Name to give DWI output directories
-#  ${b0maxbval}			- Volumes with a bvalue smaller than this value will be considered as b0s
 #  ${runcmd}			- Set to a user specifed command to use if user has requested
 #						  that commands be echo'd (or printed) instead of actually executed.
 #						  Otherwise, set to empty string.
 #
+
+echo "    --shell1Data=<shell-1-data>"
+echo "    : data with smaller b value encoding"
+echo ""
+echo "    --shell2Data=<shell-2-data>"
+echo "    : data with larger b value encoding"
+echo ""	
+echo "    --supb0=<supplementary b=0 image>"
+echo "    : supplementary b=0 image for field mapping with topup"
+echo ""
+echo "    --supb0rev=<supplementary b=0 phase-reversed image>"
+echo "    : supplementary b=0 reversed image for field mapping with topup"
+
+
 get_options()
 {
 	local scriptName=$(basename ${0})
@@ -175,12 +184,12 @@ get_options()
 	# initialize global output variables
 	unset StudyFolder
 	unset Subject
-	unset PEdir
-	unset PosInputImages
-	unset NegInputImages
+	unset Shell1Data
+	unset Shell2Data
+	unset Supb0
+	unset Supb0rev
 	unset echospacing
 	DWIName="Diffusion"
-	b0maxbval=${DEFAULT_B0_MAX_BVAL}
 	runcmd=""
 	
 	# parse arguments
@@ -209,16 +218,20 @@ get_options()
 				Subject=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
-			--PEdir=*)
-				PEdir=${argument/*=/""}
+			--shell1Data=*)
+				Shell1Data=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
-			--posData=*)
-				PosInputImages=${argument/*=/""}
+			--shell2Data=*)
+				Shell2Data=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
-			--negData=*)
-				NegInputImages=${argument/*=/""}
+			--supb0=*)
+				Supb0=${argument/*=/""}
+				index=$(( index + 1 ))
+				;;
+			--supb0rev=*)
+				Supb0rev=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
 			--dwiname=*)
@@ -227,10 +240,6 @@ get_options()
 				;;
 			--echospacing=*)
 				echospacing=${argument/*=/""}
-				index=$(( index + 1 ))
-				;;
-			--b0maxbval=*)
-				b0maxbval=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
 			--printcom=*)
@@ -259,28 +268,36 @@ get_options()
 		echo "ERROR: <subject-id> not specified"
 		exit 1
 	fi
-	
-	if [ -z ${PEdir} ]
+		
+	if [ -z ${Shell1Data} ]
 	then
 		usage
-		echo "ERROR: <phase-encoding-dir> not specified"
+		echo "ERROR: <shell-1-data> not specified"
 		exit 1
 	fi
 	
-	if [ -z ${PosInputImages} ]
+	if [ -z ${Shell2Data} ]
 	then
 		usage
-		echo "ERROR: <positive-phase-encoded-data> not specified"
+		echo "ERROR: <shell-2-data> not specified"
 		exit 1
 	fi
-	
-	if [ -z ${NegInputImages} ]
+
+	if [ -z ${Supb0} ]
 	then
 		usage
-		echo "ERROR: <negative-phase-encoded-data> not specified"
+		echo "ERROR: <supb0> not specified"
 		exit 1
 	fi
-	
+
+	if [ -z ${Supb0rev} ]
+	then
+		usage
+		echo "ERROR: <supb0rev> not specified"
+		exit 1
+	fi
+
+
 	if [ -z ${echospacing} ]
 	then
 		usage
@@ -288,12 +305,6 @@ get_options()
 		exit 1
 	fi
 	
-	if [ -z ${b0maxbval} ]
-	then
-		usage
-		echo "ERROR: <b0-max-bval> not specified"
-		exit 1
-	fi
 	
 	if [ -z ${DWIName} ]
 	then
@@ -306,12 +317,12 @@ get_options()
 	echo "-- ${scriptName}: Specified Command-Line Options - Start --"
 	echo "   StudyFolder: ${StudyFolder}"
 	echo "   Subject: ${Subject}"
-	echo "   PEdir: ${PEdir}"
-	echo "   PosInputImages: ${PosInputImages}"
-	echo "   NegInputImages: ${NegInputImages}"
+	echo "   Shell1Data: ${Shell1Data}"
+	echo "   Shell2Data: ${Shell2Data}"
+	echo "   Supb0: ${Supb0}"
+	echo "   Supb0rev: ${Supb0rev}"	
 	echo "   echospacing: ${echospacing}"
 	echo "   DWIName: ${DWIName}"
-	echo "   b0maxbval: ${b0maxbval}"
 	echo "   runcmd: ${runcmd}"
 	echo "-- ${scriptName}: Specified Command-Line Options - End --"
 }
@@ -390,12 +401,9 @@ main()
 	# Global Variables Set
 	#  ${StudyFolder}		- Path to subject's data folder
 	#  ${Subject}			- Subject ID
-	#  ${PEdir}				- Phase Encoding Direction, 1=RL/LR, 2=PA/AP
 	#  ${PosInputImages}	- @ symbol separated list of data with positive phase encoding direction
-	#  ${NegInputImages}	- @ symbol separated lsit of data with negative phase encoding direction
 	#  ${echospacing}		- echo spacing in msecs
 	#  ${DWIName}			- Name to give DWI output directories
-	#  ${b0maxbval}			- Volumes with a bvalue smaller than this value will be considered as b0s
 	#  ${runcmd}			- Set to a user specifed command to use if user has requested
 	#						  that commands be echo'd (or printed) instead of actually executed.
 	#						  Otherwise, set to empty string.
@@ -432,126 +440,33 @@ main()
 	${runcmd} mkdir ${outdir}/data
 	${runcmd} mkdir ${outdir}/reg
 	
-	if [ ${PEdir} -eq 1 ]
-	then	# RL/LR phase encoding
-		basePos="RL"
-		baseNeg="LR"
-	elif [ ${PEdir} -eq 2 ]
-	then	# PA/AP phase encoding
-		basePos="PA"
-		baseNeg="AP"
-	else
-		log_Msg "ERROR: Invalid Phase Encoding Directory (PEdir} specified: ${PEdir}"
-		exit 1
-	fi
 	
-	log_Msg "basePos: ${basePos}"
-	log_Msg "baseNeg: ${baseNeg}"
+	log_Msg "Copying raw data to working directory"
 	
-	# copy positive raw data
-	log_Msg "Copying positive raw data to working directory"
-	PosInputImages=`echo ${PosInputImages} | sed 's/@/ /g'`
-	log_Msg "PosInputImages: ${PosInputImages}"
+	basedti="dti"
 	
-	Pos_count=1
-	for Image in ${PosInputImages}
-	do
-		if [[ ${Image} =~ ^.*EMPTY.*$  ]]
-		then
-			Image=EMPTY
-		fi
+	# Copy shell 1
+	absname=`${FSLDIR}/bin/imglob ${Shell1Data}`
+	${runcmd} ${FSLDIR}/bin/imcp ${absname} ${outdir}/rawdata/${basedti}_s1
+	${runcmd} cp ${absname}.bval ${outdir}/rawdata/${basedti}_s1.bval
+	${runcmd} cp ${absname}.bvec ${outdir}/rawdata/${basedti}_s1.bvec
 		
-		if [ ${Image} = ${MissingFileFlag} ]
-		then
-			PosVols[${Pos_count}]=0
-		else
-			PosVols[${Pos_count}]=`${FSLDIR}/bin/fslval ${Image} dim4`
-			absname=`${FSLDIR}/bin/imglob ${Image}`
-			${runcmd} ${FSLDIR}/bin/imcp ${absname} ${outdir}/rawdata/${basePos}_${Pos_count}
-			${runcmd} cp ${absname}.bval ${outdir}/rawdata/${basePos}_${Pos_count}.bval
-			${runcmd} cp ${absname}.bvec ${outdir}/rawdata/${basePos}_${Pos_count}.bvec
-		fi
-		Pos_count=$((${Pos_count} + 1))
-	done
-	
-	# copy negative raw data
-	log_Msg "Copying negative raw data to working directory"
-	NegInputImages=`echo ${NegInputImages} | sed 's/@/ /g'`
-	log_Msg "NegInputImages: ${NegInputImages}"
-	
-	Neg_count=1
-	for Image in ${NegInputImages}
-	do
-		if [[ ${Image} =~ ^.*EMPTY.*$  ]]
-		then
-			Image=EMPTY
-		fi
-		
-		if [ ${Image} = ${MissingFileFlag} ]
-		then
-			NegVols[${Neg_count}]=0
-		else
-			NegVols[${Neg_count}]=`${FSLDIR}/bin/fslval ${Image} dim4`
-			absname=`${FSLDIR}/bin/imglob ${Image}`
-			${runcmd} ${FSLDIR}/bin/imcp ${absname} ${outdir}/rawdata/${baseNeg}_${Neg_count}
-			${runcmd} cp ${absname}.bval ${outdir}/rawdata/${baseNeg}_${Neg_count}.bval
-			${runcmd} cp ${absname}.bvec ${outdir}/rawdata/${baseNeg}_${Neg_count}.bvec
-		fi
-		Neg_count=$((${Neg_count} + 1))
-	done
-	
-	# verify positive and negative datasets are provided in pairs
-	if [ ${Pos_count} -ne ${Neg_count} ]
-	then
-		log_Msg "Wrong number of input datasets! Make sure that you provide pairs of input filenames."
-		log_Msg "If the respective file does not exist, use EMPTY in the input arguments."
-		exit 1
-	fi
+	# Copy shell 2
+	absname=`${FSLDIR}/bin/imglob ${Shell2Data}`
+	${runcmd} ${FSLDIR}/bin/imcp ${absname} ${outdir}/rawdata/${basedti}_s2
+	${runcmd} cp ${absname}.bval ${outdir}/rawdata/${basedti}_s2.bval
+	${runcmd} cp ${absname}.bvec ${outdir}/rawdata/${basedti}_s2.bvec
 
-	# Create two files for each phase encoding direction, that for each series contain the number of 
-	# corresponding volumes and the number of actual volumes. The file e.g. RL_SeriesCorrespVolNum.txt
-	# will contain as many rows as non-EMPTY series. The entry M in row J indicates that volumes 0-M 
-	# from RLseries J has corresponding LR pairs. This file is used in basic_preproc to generate 
-	# topup/eddy indices and extract corresponding b0s for topup. The file e.g. Pos_SeriesVolNum.txt 
-	# will have as many rows as maximum series pairs (even unmatched pairs). The entry M N in row J 
-	# indicates that the RLSeries J has its 0-M volumes corresponding to LRSeries J and RLJ has N 
-	# volumes in total. This file is used in eddy_combine.
-	log_Msg "Create two files for each phase encoding direction"
-	
-	Paired_flag=0
-	for (( j=1; j<${Pos_count}; j++ ))
-	do
-		CorrVols=`min ${NegVols[${j}]} ${PosVols[${j}]}`
-		${runcmd} echo ${CorrVols} ${PosVols[${j}]} >> ${outdir}/eddy/Pos_SeriesVolNum.txt
-		if [ ${PosVols[${j}]} -ne 0 ]
-		then
-			${runcmd} echo ${CorrVols} >> ${outdir}/rawdata/${basePos}_SeriesCorrespVolNum.txt
-			if [ ${CorrVols} -ne 0 ]
-			then
-				Paired_flag=1
-			fi
-		fi
-	done
-	
-	for (( j=1; j<${Neg_count}; j++ ))
-	do
-		CorrVols=`min ${NegVols[${j}]} ${PosVols[${j}]}`
-		${runcmd} echo ${CorrVols} ${NegVols[${j}]} >> ${outdir}/eddy/Neg_SeriesVolNum.txt
-		if [ ${NegVols[${j}]} -ne 0 ]
-		then
-			${runcmd} echo ${CorrVols} >> ${outdir}/rawdata/${baseNeg}_SeriesCorrespVolNum.txt
-		fi
-	done
-	
-	if [ ${Paired_flag} -eq 0 ]
-	then
-		log_Msg "Wrong Input! No pairs of phase encoding directions have been found!"
-		log_Msg "At least one pair is needed!"
-		exit 1
-	fi
-	
+	# Copy sup b=0
+	absname=`${FSLDIR}/bin/imglob ${Supb0}`
+	${runcmd} ${FSLDIR}/bin/imcp ${absname} ${outdir}/rawdata/${basedti}_supb0
+
+	# Copy sup b=0 rev
+	absname=`${FSLDIR}/bin/imglob ${Supb0rev}`
+	${runcmd} ${FSLDIR}/bin/imcp ${absname} ${outdir}/rawdata/${basedti}_supb0rev
+
 	log_Msg "Running Basic Preprocessing"
-	${runcmd} ${HCPPIPEDIR_dMRI}/basic_preproc.sh ${outdir} ${echospacing} ${PEdir} ${b0dist} ${b0maxbval}
+	${runcmd} ${HCPPIPEDIR_dMRI}/basic_preproc.sh ${outdir} ${echospacing} ${b0dist}
 	
 	log_Msg "Running Topup"
 	${runcmd} ${HCPPIPEDIR_dMRI}/run_topup.sh ${outdir}/topup

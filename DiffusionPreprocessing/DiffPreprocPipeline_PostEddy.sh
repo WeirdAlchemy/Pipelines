@@ -95,10 +95,6 @@ usage()
 	echo "    --subject=<subject-id>"
 	echo "    : Subject ID"
 	echo ""
-	echo "    --gdcoeffs=<path-to-gradients-coefficients-file>"
-	echo "    : path to file containing coefficients that describe spatial variations"
-	echo "      of the scanner gradients. Use --gdcoeffs=NONE if not available"
-	echo ""
 	echo "    [--dwiname=<DWIName>]"
 	echo "    : name to give DWI output directories"
 	echo "      defaults to Diffusion"
@@ -174,7 +170,6 @@ get_options()
 	# initialize global output variables
 	unset StudyFolder
 	unset Subject
-	unset GdCoeffs
 	DWIName="Diffusion"
 	DegreesOfFreedom=6
 	runcmd=""
@@ -203,10 +198,6 @@ get_options()
 				;;
 			--subject=*)
 				Subject=${argument/*=/""}
-				index=$(( index + 1 ))
-				;;
-			--gdcoeffs=*)
-				GdCoeffs=${argument/*=/""}
 				index=$(( index + 1 ))
 				;;
 			--dof=*)
@@ -244,13 +235,6 @@ get_options()
 		exit 1
 	fi
 	
-	if [ -z ${GdCoeffs} ]
-	then
-		usage
-		echo "ERROR: <path-to-gradients-coefficients-file> not specified"
-		exit 1
-	fi
-	
 	if [ -z ${DWIName} ]
 	then
 		usage
@@ -263,7 +247,6 @@ get_options()
 	echo "   StudyFolder: ${StudyFolder}"
 	echo "   Subject: ${Subject}"
 	echo "   DWIName: ${DWIName}"
-	echo "   GdCoeffs: ${GdCoeffs}"
 	echo "   DegreesOfFreedom: ${DegreesOfFreedom}"
 	echo "   runcmd: ${runcmd}"
 	echo "-- ${scriptName}: Specified Command-Line Options - End --"
@@ -322,7 +305,7 @@ validate_environment_vars()
 main()
 {
 	# Hard-Coded variables for the pipeline
-	CombineDataFlag=1  # If JAC resampling has been used in eddy, decide what to do with the output file
+	CombineDataFlag=2  # If JAC resampling has been used in eddy, decide what to do with the output file
 	                   # 2 for including in the output all volumes uncombined (i.e. output file of eddy)
 	                   # 1 for including in the output and combine only volumes where both LR/RL
 	                   #   (or AP/PA) pairs have been acquired
@@ -333,8 +316,6 @@ main()
 	# Global Variables Set
 	#  ${StudyFolder} - Path to subject's data folder
 	#  ${Subject}     - Subject ID
-	#  ${GdCoeffs}    - Path to file containing coefficients that describe spatial variations
-	#                   of the scanner gradients. Use NONE if not available.
 	#  ${DWIName}     - Name to give DWI output directories
 	#  ${runcmd}      - Set to a user specifed command to use if user has requested
 	#                   that commands be echo'd (or printed) instead of actually executed.
@@ -353,14 +334,9 @@ main()
 	
 	# Determine whether Gradient Nonlinearity Distortion coefficients are supplied
 	GdFlag=0
-	if [ ! ${GdCoeffs} = "NONE" ]
-	then
-		log_Msg "Gradient nonlinearity distortion correction coefficients found!"
-		GdFlag=1
-	fi
 	
 	log_Msg "Running Eddy PostProcessing"
-	${runcmd} ${HCPPIPEDIR_dMRI}/eddy_postproc.sh ${outdir} ${GdCoeffs} ${CombineDataFlag}
+	${runcmd} ${HCPPIPEDIR_dMRI}/eddy_postproc.sh ${outdir} ${CombineDataFlag}
 	
 	# Establish variables that follow naming conventions
 	T1wFolder="${StudyFolder}/${Subject}/T1w" #Location of T1w images

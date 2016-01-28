@@ -38,4 +38,3 @@ if [ ! -f ${workingdir}/nodif_brain.nii.gz ]; then
 fi
 
 echo -e "\n END: run_topup"
-

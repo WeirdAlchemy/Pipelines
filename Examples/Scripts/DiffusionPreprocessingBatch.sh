@@ -40,7 +40,7 @@ get_batch_options() {
 get_batch_options $@
 
 StudyFolder="/shared/studies/nonregulated/connectome/Subjects" #Location of Subject folders (named by subjectID)
-Subjlist="26712" #Space delimited list of subject IDs
+Subjlist="EX73706" #Space delimited list of subject IDs
 EnvironmentScript="/shared/studies/nonregulated/connectome/Pipelines/Examples/Scripts/SetUpHCPPipeline.sh" #Pipeline environment script
 
 if [ -n "${command_line_specified_study_folder}" ]; then
@@ -76,21 +76,14 @@ PRINTCOM=""
 #which is a prerequisite for this pipeline
 
 #Scripts called by this script do NOT assume anything about the form of the input names or paths.
-#This batch script assumes the HCP raw data naming convention, e.g.
 
-#	${StudyFolder}/${Subject}/unprocessed/3T/Diffusion/${SubjectID}_3T_DWI_dir95_RL.nii.gz
-#	${StudyFolder}/${Subject}/unprocessed/3T/Diffusion/${SubjectID}_3T_DWI_dir96_RL.nii.gz
-#	${StudyFolder}/${Subject}/unprocessed/3T/Diffusion/${SubjectID}_3T_DWI_dir97_RL.nii.gz
-#	${StudyFolder}/${Subject}/unprocessed/3T/Diffusion/${SubjectID}_3T_DWI_dir95_LR.nii.gz
-#	${StudyFolder}/${Subject}/unprocessed/3T/Diffusion/${SubjectID}_3T_DWI_dir96_LR.nii.gz
-#	${StudyFolder}/${Subject}/unprocessed/3T/Diffusion/${SubjectID}_3T_DWI_dir97_LR.nii.gz
+#	${StudyFolder}/${Subject}/unprocessed/3T/Diffusion/${SubjectID}_3T_DWI_shell1.nii.gz
+#	${StudyFolder}/${Subject}/unprocessed/3T/Diffusion/${SubjectID}_3T_DWI_shell2.nii.gz
+#	${StudyFolder}/${Subject}/unprocessed/3T/Diffusion/${SubjectID}_3T_DWI_supb0.nii.gz
+#	${StudyFolder}/${Subject}/unprocessed/3T/Diffusion/${SubjectID}_3T_DWI_supb0rev.nii.gz
 
-#Change Scan Settings: Echo Spacing and PEDir to match your images
+#Change Scan Settings: Echo Spacing to match your images
 #These are set to match the HCP Protocol by default
-
-#If using gradient distortion correction, use the coefficents from your scanner
-#The HCP gradient distortion coefficents are only available through Siemens
-#Gradient distortion in standard scanners like the Trio is much less than for the HCP Skyra.
 
 ######################################### DO WORK ##########################################
 
@@ -101,20 +94,21 @@ for Subject in $Subjlist ; do
   SubjectID="$Subject" #Subject ID Name
   RawDataDir="$StudyFolder/$SubjectID/unprocessed/3T/Diffusion" #Folder where unprocessed diffusion data are
 
-  # Data with positive Phase encoding direction. Up to N>=1 series (here N=3), separated by @. (LR in HCP data, AP in 7T HCP data)
-  PosData="${RawDataDir}/${SubjectID}_3T_DWI_dir95_RL.nii.gz@${RawDataDir}/${SubjectID}_3T_DWI_dir96_RL.nii.gz@${RawDataDir}/${SubjectID}_3T_DWI_dir97_RL.nii.gz"
+  # Shell 1 data
+  Shell1Data="${RawDataDir}/${SubjectID}_3T_DWI_shell1.nii.gz"
 
-  # Data with negative Phase encoding direction. Up to N>=1 series (here N=3), separated by @. (RL in HCP data, PA in 7T HCP data)
-  # If corresponding series is missing (e.g. 2 RL series and 1 LR) use EMPTY.
-  NegData="${RawDataDir}/${SubjectID}_3T_DWI_dir95_LR.nii.gz@${RawDataDir}/${SubjectID}_3T_DWI_dir96_LR.nii.gz@${RawDataDir}/${SubjectID}_3T_DWI_dir97_LR.nii.gz"
+  # Shell 2 data
+  Shell2Data="${RawDataDir}/${SubjectID}_3T_DWI_shell2.nii.gz"
 
+  # Supplementary b=0
+  Supb0="${RawDataDir}/${SubjectID}_3T_DWI_supb0.nii.gz"
+
+  # Supplementary b=0 phase reversed
+  Supb0rev="${RawDataDir}/${SubjectID}_3T_DWI_supb0rev.nii.gz"
+
+  # TODO Figure out BNAC echo spacing
   #Scan Setings
   EchoSpacing=0.78 #Echo Spacing or Dwelltime of dMRI image, set to NONE if not used. Dwelltime = 1/(BandwidthPerPixelPhaseEncode * # of phase encoding samples): DICOM field (0019,1028) = BandwidthPerPixelPhaseEncode, DICOM field (0051,100b) AcquisitionMatrixText first value (# of phase encoding samples).  On Siemens, iPAT/GRAPPA factors have already been accounted for.
-  PEdir=1 #Use 1 for Left-Right Phase Encoding, 2 for Anterior-Posterior
-
-  #Config Settings
-  # Gdcoeffs="${HCPPIPEDIR_Config}/coeff_SC72C_Skyra.grad" #Coefficients that describe spatial variations of the scanner gradients. Use NONE if not available.
-  Gdcoeffs="NONE" # Set to NONE to skip gradient distortion correction
 
   if [ -n "${command_line_specified_run_local}" ] ; then
       echo "About to run ${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline.sh"
@@ -125,10 +119,10 @@ for Subject in $Subjlist ; do
   fi
 
   ${queuing_command} ${HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline.sh \
-      --posData="${PosData}" --negData="${NegData}" \
+      --shell1Data="${Shell1Data}" --shell2Data="${Shell2Data}" \
+      --supb0="${Supb0}" --supb0rev="${Supb0rev}" \
       --path="${StudyFolder}" --subject="${SubjectID}" \
-      --echospacing="${EchoSpacing}" --PEdir=${PEdir} \
-      --gdcoeffs="${Gdcoeffs}" \
+      --echospacing="${EchoSpacing}" \
       --printcom=$PRINTCOM
 
 done

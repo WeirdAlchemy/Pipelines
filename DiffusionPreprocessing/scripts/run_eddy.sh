@@ -355,6 +355,8 @@ main()
 	topupdir=`dirname ${workingdir}`/topup
 	
 	${FSLDIR}/bin/imcp ${topupdir}/nodif_brain_mask ${workingdir}/
+
+  echo "1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1" > ${workingdir}/index.txt
 	
 	eddy_command="${eddyExec} "
 	eddy_command+="${outlierStatsOption} "
